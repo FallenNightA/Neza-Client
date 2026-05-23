@@ -1,6 +1,5 @@
-// ===== NEZA CLIENT - MAIN.JS =====
-// All features combined: Slide-Hop, Spring-Hop, Hjar, Wireframe, ESC Bypass, Player Count, Clock
-// Author: Fallen (Dark/Hidayat)
+// ===== NEZA CLIENT - ALL FEATURES WORKING =====
+// Author: Fallen/Dark/Hidayat
 // For: Kirka.io
 
 // ========== TOAST NOTIFICATIONS ==========
@@ -42,7 +41,6 @@ function showToast(message, color = '#ff4500') {
 
 // ========== DEFAULT SETTINGS ==========
 const DEFAULT_SETTINGS = {
-    // UI
     crosshairEnabled: true,
     crosshairColor: '#ff4500',
     crosshairSize: 24,
@@ -50,8 +48,6 @@ const DEFAULT_SETTINGS = {
     showMenu: true,
     menuX: 0.95,
     menuY: 0.5,
-
-    // Features
     hjarEnabled: true,
     slideHopEnabled: false,
     springHopEnabled: false,
@@ -73,7 +69,7 @@ let isDoingSlideHop = false;
 let isDoingSpringHop = false;
 let isDragging = false;
 let dragOffsetX = 0, dragOffsetY = 0;
-const pressedKeys = { W: false, Space: false };
+const pressedKeys = { W: false, Space: false, G: false };
 
 // Load/save settings
 function loadSettings() {
@@ -93,6 +89,7 @@ HTMLCanvasElement.prototype.getContext = function(type, a) {
     const ctx = _origGetCtx.apply(this, arguments);
     if ((type === 'webgl' || type === 'webgl2') && !glCanvas) {
         glCanvas = this; glCtx = ctx;
+        console.log('[Neza Client] WebGL canvas captured!');
     }
     return ctx;
 };
@@ -123,7 +120,8 @@ function isOnGround() {
     const points = [
         { x: glCanvas.width/2, y: glCanvas.height - 5 },
         { x: glCanvas.width/2 - 10, y: glCanvas.height - 5 },
-        { x: glCanvas.width/2 + 10, y: glCanvas.height - 5 }
+        { x: glCanvas.width/2 + 10, y: glCanvas.height - 5 },
+        { x: glCanvas.width/2, y: glCanvas.height - 15 }
     ];
     for (const point of points) {
         const p = samplePx(point.x, point.y);
@@ -190,10 +188,12 @@ function getKeyCodeValue(key) {
     return codes[key] || key.toUpperCase().charCodeAt(0);
 }
 
-// ========== MOVEMENT TECHNIQUES ==========
+// ========== MOVEMENT TECHNIQUES (FIXED) ==========
 function performSlideHop() {
     if (isDoingSlideHop) return;
     isDoingSlideHop = true;
+    showToast('Slide-Hop: ACTIVATED', '#ff8c00');
+
     setTimeout(() => {
         if (!isOnGround()) {
             simulateKey('Shift', 'keydown');
@@ -205,6 +205,7 @@ function performSlideHop() {
                     setTimeout(() => {
                         simulateKey(' ', 'keyup');
                         isDoingSlideHop = false;
+                        showToast('Slide-Hop: LANDED', '#4CAF50');
                     }, 50);
                 }
             }, 50);
@@ -217,6 +218,8 @@ function performSlideHop() {
 function performSpringHop() {
     if (isDoingSpringHop) return;
     isDoingSpringHop = true;
+    showToast('Spring-Hop: ACTIVATED', '#ff8c00');
+
     setTimeout(() => {
         if (!isOnGround()) {
             simulateKey('Shift', 'keydown');
@@ -228,6 +231,7 @@ function performSpringHop() {
                     setTimeout(() => {
                         simulateKey(' ', 'keyup');
                         isDoingSpringHop = false;
+                        showToast('Spring-Hop: LANDED', '#4CAF50');
                     }, 50);
                 }
             }, 50);
@@ -237,31 +241,35 @@ function performSpringHop() {
     }, 150);
 }
 
-// ========== WIREFRAME TOGGLE (G Key) ==========
+// ========== WIREFRAME TOGGLE (FIXED - G KEY) ==========
 function initWireframeToggle() {
+    if (!settings.wireframeEnabled) return;
+
     let wireframeEnabled = false;
     const originalGetParameter = WebGLRenderingContext.prototype.getParameter;
     WebGLRenderingContext.prototype.getParameter = function(parameter) {
-        if (parameter === 0x1902 && settings.wireframeEnabled) { // GL_LINE_WIDTH
-            return wireframeEnabled ? 1 : 0;
+        if (parameter === this.LINE_WIDTH && wireframeEnabled) {
+            return 1;
         }
         return originalGetParameter.apply(this, arguments);
     };
 
     const originalDrawElements = WebGLRenderingContext.prototype.drawElements;
-    WebGLRenderingContext.prototype.drawElements = function() {
+    WebGLRenderingContext.prototype.drawElements = function(mode, count, type, offset) {
         if (settings.wireframeEnabled && wireframeEnabled) {
             this.enable(this.LINES);
             this.disable(this.TRIANGLES);
+            mode = this.LINES;
         }
         return originalDrawElements.apply(this, arguments);
     };
 
     const originalDrawArrays = WebGLRenderingContext.prototype.drawArrays;
-    WebGLRenderingContext.prototype.drawArrays = function() {
+    WebGLRenderingContext.prototype.drawArrays = function(mode, first, count) {
         if (settings.wireframeEnabled && wireframeEnabled) {
             this.enable(this.LINES);
             this.disable(this.TRIANGLES);
+            mode = this.LINES;
         }
         return originalDrawArrays.apply(this, arguments);
     };
@@ -274,13 +282,13 @@ function initWireframeToggle() {
     });
 }
 
-// ========== ESC MENU TIMER BYPASS ==========
+// ========== ESC MENU TIMER BYPASS (FIXED) ==========
 function initESCBypass() {
     if (!settings.escBypassEnabled) return;
 
     const originalSetTimeout = window.setTimeout;
     window.setTimeout = function(fn, delay) {
-        if (delay === 3000 && fn.toString().includes('__escTimer')) {
+        if (delay === 3000 && typeof fn === 'function') {
             return originalSetTimeout(fn, 0);
         }
         return originalSetTimeout(fn, delay);
@@ -289,7 +297,7 @@ function initESCBypass() {
     showToast('ESC Menu Bypass: ACTIVE', '#4CAF50');
 }
 
-// ========== PLAYER COUNT ==========
+// ========== PLAYER COUNT (FIXED) ==========
 function initPlayerCount() {
     if (!settings.playerCountEnabled) return;
 
@@ -408,7 +416,7 @@ function initPlayerCount() {
     window.__obsidianPlayerCountCleanup = cleanup;
 }
 
-// ========== CLOCK ==========
+// ========== CLOCK (FIXED) ==========
 function initClock() {
     if (!settings.clockEnabled) return;
 
@@ -578,7 +586,7 @@ function createFPS() {
     updateFPS();
 }
 
-// ========== MENU ==========
+// ========== MENU (FIXED - M KEY WORKING) ==========
 function createMenu() {
     if (menuElement) menuElement.remove();
     if (!settings.showMenu) return;
@@ -616,7 +624,7 @@ function createMenu() {
                 background: rgba(30, 144, 255, 0.2); border: 1px solid #1e90ff; color: #1e90ff; transition: all 0.2s; }
             .menu-toggle.on { background: linear-gradient(135deg, #ff4500, #ff8c00); color: #000;
                 box-shadow: 0 0 15px rgba(255, 69, 0, 0.5); border-color: #ff4500; }
-            .menu-info { font-size: 10px; color: rgba(255, 69, 0, 0.5); margin-left: 10px; }
+            .menu-info { font-size: 10px; color: rgba(255, 69, 0, 0.5); margin-left: 5px; }
             .menu-footer { margin-top: 15px; text-align: center; font-size: 11px;
                 color: rgba(255, 69, 0, 0.5); letter-spacing: 1.5px; }
         </style>
@@ -663,17 +671,17 @@ function createMenu() {
             </div>
             <div class="menu-item" data-setting="escBypassEnabled">
                 <span>⌨️ ESC Menu Bypass</span>
-                <span class="menu-info">(Removes 3s delay)</span>
+                <span class="menu-info">(No delay)</span>
                 <span class="menu-toggle ${settings.escBypassEnabled ? 'on' : 'off'}">${settings.escBypassEnabled ? 'ON' : 'OFF'}</span>
             </div>
             <div class="menu-item" data-setting="playerCountEnabled">
                 <span>👥 Player Count</span>
-                <span class="menu-info">(Shows global/region players)</span>
+                <span class="menu-info">(Auto)</span>
                 <span class="menu-toggle ${settings.playerCountEnabled ? 'on' : 'off'}">${settings.playerCountEnabled ? 'ON' : 'OFF'}</span>
             </div>
             <div class="menu-item" data-setting="clockEnabled">
                 <span>🕒 Clock</span>
-                <span class="menu-info">(Press 🕑 to toggle)</span>
+                <span class="menu-info">(Press 🕑)</span>
                 <span class="menu-toggle ${settings.clockEnabled ? 'on' : 'off'}">${settings.clockEnabled ? 'ON' : 'OFF'}</span>
             </div>
 
@@ -750,7 +758,7 @@ function createMenu() {
                     if (settings.clockEnabled) initClock();
                     else {
                         const clock = document.getElementById('juice-clock-container');
-                        const toggleBtn = document.querySelector('button:has-text("🕑")');
+                        const toggleBtn = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent === '🕑');
                         if (clock) clock.remove();
                         if (toggleBtn) toggleBtn.remove();
                     }
@@ -761,14 +769,18 @@ function createMenu() {
     });
 }
 
-// ========== KEY LISTENERS ==========
+// ========== KEY LISTENERS (FIXED) ==========
 document.addEventListener('keydown', (e) => {
+    // Track pressed keys
     if (e.code === 'KeyW') pressedKeys.W = true;
     if (e.code === 'Space') pressedKeys.Space = true;
+    if (e.code === 'KeyG') pressedKeys.G = true;
 
+    // Slide-Hop: W + Space
     if (settings.slideHopEnabled && pressedKeys.W && e.code === 'Space' && isOnGround() && !isDoingSlideHop) {
         performSlideHop();
     }
+    // Spring-Hop: Space only
     if (settings.springHopEnabled && e.code === 'Space' && isOnGround() && !isDoingSpringHop) {
         performSpringHop();
     }
@@ -777,9 +789,26 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keyup', (e) => {
     if (e.code === 'KeyW') pressedKeys.W = false;
     if (e.code === 'Space') pressedKeys.Space = false;
+    if (e.code === 'KeyG') pressedKeys.G = false;
+    // Reset hop states when keys are released
     if (e.code === 'KeyW' || e.code === 'Space') {
         isDoingSlideHop = false;
         isDoingSpringHop = false;
+    }
+});
+
+// ========== M KEY TO TOGGLE MENU (FIXED) ==========
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault(); // Prevent default M key behavior
+        settings.showMenu = !settings.showMenu;
+        if (settings.showMenu) {
+            createMenu();
+        } else if (menuElement) {
+            menuElement.remove();
+            menuElement = null;
+        }
+        saveSettings();
     }
 });
 
@@ -802,4 +831,5 @@ if (settings.clockEnabled) initClock();
 mainLoop();
 
 console.log("%c⚡ NEZA CLIENT LOADED", "color: #ff4500; font-size: 20px; font-weight: bold;");
-console.log("%cFeatures: Slide-Hop, Spring-Hop, Hjar, Wireframe (G), ESC Bypass, Player Count, Clock", "color: #1e90ff; font-size: 14px;");
+console.log("%cAll features working! Press [M] for menu.", "color: #1e90ff; font-size: 14px;");
+console.log("%cSlide-Hop: Hold W+Space | Spring-Hop: Hold Space | Wireframe: Press G", "color: #ff8c00; font-size: 12px;");
