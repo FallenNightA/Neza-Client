@@ -1,6 +1,7 @@
 // ===== NEZA CLIENT - ALL FEATURES WORKING =====
 // Author: Fallen/Dark/Hidayat
 // For: Kirka.io
+// Version: 10.0
 
 // ========== TOAST NOTIFICATIONS ==========
 function showToast(message, color = '#ff4500') {
@@ -41,6 +42,7 @@ function showToast(message, color = '#ff4500') {
 
 // ========== DEFAULT SETTINGS ==========
 const DEFAULT_SETTINGS = {
+    // UI
     crosshairEnabled: true,
     crosshairColor: '#ff4500',
     crosshairSize: 24,
@@ -48,6 +50,8 @@ const DEFAULT_SETTINGS = {
     showMenu: true,
     menuX: 0.95,
     menuY: 0.5,
+
+    // Features
     hjarEnabled: true,
     slideHopEnabled: false,
     springHopEnabled: false,
@@ -88,11 +92,48 @@ const _origGetCtx = HTMLCanvasElement.prototype.getContext;
 HTMLCanvasElement.prototype.getContext = function(type, a) {
     const ctx = _origGetCtx.apply(this, arguments);
     if ((type === 'webgl' || type === 'webgl2') && !glCanvas) {
-        glCanvas = this; glCtx = ctx;
-        console.log('[Neza Client] WebGL canvas captured!');
+        glCanvas = this;
+        glCtx = ctx;
+        console.log('[Neza Client] ✅ WebGL canvas captured!');
+        // Force Hjar initialization if enabled
+        if (settings.hjarEnabled) initHjar();
     }
     return ctx;
 };
+
+// ========== HJAR (ESP) SYSTEM (FIXED) ==========
+function initHjar() {
+    if (!glCanvas || !glCtx) {
+        setTimeout(initHjar, 500); // Retry after delay
+        return;
+    }
+
+    window.nezaEng = null;
+    const originalIsArray = Array.isArray;
+    Array.isArray = new Proxy(originalIsArray, {
+        apply(target, thisArg, args) {
+            const material = args[0];
+            const result = Reflect.apply(target, thisArg, args);
+            try {
+                if (settings.hjarEnabled && material?.map?.image?.width === 64) {
+                    // Enable wallhack
+                    material.depthTest = false;
+                    for (let key in material) {
+                        if (material[key] === 3) {
+                            material[key] = 1;
+                            if (!window.nezaEng) {
+                                window.nezaEng = material;
+                                console.log('[Neza Client] ✅ Hjar Engine captured!');
+                                showToast('Hjar (ESP): ACTIVE', '#4CAF50');
+                            }
+                        }
+                    }
+                }
+            } catch (_) {}
+            return result;
+        }
+    });
+}
 
 // ========== CANVAS-BASED DETECTION ==========
 function samplePx(x, y) {
@@ -109,9 +150,9 @@ function isPlayerPx({ r, g, b, a }) {
     const br = (r + g + b) / 3;
     const max = Math.max(r, g, b), min = Math.min(r, g, b);
     const sat = max - min;
-    if (br > 205 && sat < 30) return false;
-    if (br < 15) return false;
-    if (b > r + 55 && b > g + 25 && br > 130) return false;
+    if (br > 205 && sat < 30) return false; // White wall
+    if (br < 15) return false;               // Void/black
+    if (b > r + 55 && b > g + 25 && br > 130) return false; // Sky
     return true;
 }
 
@@ -132,7 +173,7 @@ function isOnGround() {
     return false;
 }
 
-// ========== HJAR DETECTION ==========
+// ========== HJAR DETECTION LOOP ==========
 function detectHjar() {
     if (!settings.hjarEnabled) {
         if (hjarState !== 'none') { hjarState = 'none'; updateHjarUI(); }
@@ -188,7 +229,7 @@ function getKeyCodeValue(key) {
     return codes[key] || key.toUpperCase().charCodeAt(0);
 }
 
-// ========== MOVEMENT TECHNIQUES (FIXED) ==========
+// ========== MOVEMENT TECHNIQUES ==========
 function performSlideHop() {
     if (isDoingSlideHop) return;
     isDoingSlideHop = true;
@@ -241,22 +282,26 @@ function performSpringHop() {
     }, 150);
 }
 
-// ========== WIREFRAME TOGGLE (FIXED - G KEY) ==========
+// ========== WIREFRAME TOGGLE (G KEY - FIXED) ==========
 function initWireframeToggle() {
-    if (!settings.wireframeEnabled) return;
-
-    let wireframeEnabled = false;
-    const originalGetParameter = WebGLRenderingContext.prototype.getParameter;
-    WebGLRenderingContext.prototype.getParameter = function(parameter) {
-        if (parameter === this.LINE_WIDTH && wireframeEnabled) {
-            return 1;
+    if (!settings.wireframeEnabled) {
+        // Remove wireframe if disabled
+        if (window.wireframeEnabled !== undefined) {
+            window.wireframeEnabled = false;
+            if (glCtx) {
+                glCtx.enable(glCtx.TRIANGLES);
+                glCtx.disable(glCtx.LINES);
+            }
         }
-        return originalGetParameter.apply(this, arguments);
-    };
+        return;
+    }
 
-    const originalDrawElements = WebGLRenderingContext.prototype.drawElements;
-    WebGLRenderingContext.prototype.drawElements = function(mode, count, type, offset) {
-        if (settings.wireframeEnabled && wireframeEnabled) {
+    window.wireframeEnabled = false;
+
+    // Hook drawElements
+    const originalDrawElements = glCtx.drawElements;
+    glCtx.drawElements = function(mode, count, type, offset) {
+        if (window.wireframeEnabled) {
             this.enable(this.LINES);
             this.disable(this.TRIANGLES);
             mode = this.LINES;
@@ -264,9 +309,10 @@ function initWireframeToggle() {
         return originalDrawElements.apply(this, arguments);
     };
 
-    const originalDrawArrays = WebGLRenderingContext.prototype.drawArrays;
-    WebGLRenderingContext.prototype.drawArrays = function(mode, first, count) {
-        if (settings.wireframeEnabled && wireframeEnabled) {
+    // Hook drawArrays
+    const originalDrawArrays = glCtx.drawArrays;
+    glCtx.drawArrays = function(mode, first, count) {
+        if (window.wireframeEnabled) {
             this.enable(this.LINES);
             this.disable(this.TRIANGLES);
             mode = this.LINES;
@@ -274,10 +320,11 @@ function initWireframeToggle() {
         return originalDrawArrays.apply(this, arguments);
     };
 
+    // Toggle with G key
     document.addEventListener('keydown', (e) => {
         if (e.code === 'KeyG' && settings.wireframeEnabled) {
-            wireframeEnabled = !wireframeEnabled;
-            showToast(`Wireframe: ${wireframeEnabled ? 'ON' : 'OFF'}`, wireframeEnabled ? '#4CAF50' : '#f44336');
+            window.wireframeEnabled = !window.wireframeEnabled;
+            showToast(`Wireframe: ${window.wireframeEnabled ? 'ON' : 'OFF'}`, window.wireframeEnabled ? '#4CAF50' : '#f44336');
         }
     });
 }
@@ -288,16 +335,16 @@ function initESCBypass() {
 
     const originalSetTimeout = window.setTimeout;
     window.setTimeout = function(fn, delay) {
+        // Bypass 3-second ESC timer
         if (delay === 3000 && typeof fn === 'function') {
             return originalSetTimeout(fn, 0);
         }
         return originalSetTimeout(fn, delay);
     };
-
     showToast('ESC Menu Bypass: ACTIVE', '#4CAF50');
 }
 
-// ========== PLAYER COUNT (FIXED) ==========
+// ========== PLAYER COUNT ==========
 function initPlayerCount() {
     if (!settings.playerCountEnabled) return;
 
@@ -346,7 +393,7 @@ function initPlayerCount() {
                 playercountnumber += element[microwave_players] || 0;
             });
         } catch (err) {
-            console.warn(`Error fetching player count for ${region}:`, err);
+            console.warn(`[Neza Client] Error fetching player count for ${region}:`, err);
         }
         return playercountnumber;
     }
@@ -358,6 +405,7 @@ function initPlayerCount() {
         playcountelement.innerHTML = `<div>${text}: ${number}</div>`;
         playcountelement.style.color = '#fff';
         playcountelement.style.fontSize = '14px';
+        playcountelement.style.fontFamily = "'Courier New', monospace";
         return playcountelement;
     }
 
@@ -382,6 +430,7 @@ function initPlayerCount() {
             currentlyplaying.style.color = '#fff';
             currentlyplaying.style.fontSize = '16px';
             currentlyplaying.style.fontWeight = 'bold';
+            currentlyplaying.style.fontFamily = "'Courier New', monospace";
 
             const playerholderelement = document.createElement("div");
             playerholderelement.id = "playerholderelement";
@@ -395,10 +444,11 @@ function initPlayerCount() {
             playerholderelement.append(currentlyplaying, ...elements);
 
             const appendToInterface = () => {
-                if (window.location.href === "https://kirka.io/" &&
-                    document.getElementsByClassName("interface text-2")[0] &&
-                    !document.getElementById("playerholderelement")) {
-                    document.getElementsByClassName("interface text-2")[0].appendChild(playerholderelement);
+                const interfaceElement = document.querySelector('.interface.text-2') ||
+                                        document.querySelector('.interface') ||
+                                        document.body;
+                if (interfaceElement && !document.getElementById("playerholderelement")) {
+                    interfaceElement.appendChild(playerholderelement);
                 }
             };
 
@@ -407,7 +457,7 @@ function initPlayerCount() {
             observer.observe(document, { subtree: true, childList: true });
             intervalId = setInterval(updatePlayerCount, 30000);
         } catch (err) {
-            console.error('Error updating player count:', err);
+            console.error('[Neza Client] Error updating player count:', err);
         }
     }
 
@@ -416,7 +466,7 @@ function initPlayerCount() {
     window.__obsidianPlayerCountCleanup = cleanup;
 }
 
-// ========== CLOCK (FIXED) ==========
+// ========== CLOCK ==========
 function initClock() {
     if (!settings.clockEnabled) return;
 
@@ -732,6 +782,7 @@ function createMenu() {
             e.stopPropagation();
             const setting = item.dataset.setting;
             if (Object.keys(DEFAULT_SETTINGS).includes(setting)) {
+                const wasEnabled = settings[setting];
                 settings[setting] = !settings[setting];
                 const toggleSpan = item.querySelector('.menu-toggle');
                 toggleSpan.textContent = settings[setting] ? 'ON' : 'OFF';
@@ -747,7 +798,10 @@ function createMenu() {
                 if (setting === 'showMenu') {
                     if (!settings.showMenu && menuElement) { menuElement.remove(); menuElement = null; }
                 }
-                if (setting === 'hjarEnabled' && !settings.hjarEnabled) { hjarState = 'none'; updateHjarUI(); }
+                if (setting === 'hjarEnabled') {
+                    if (settings.hjarEnabled) initHjar();
+                    else { hjarState = 'none'; updateHjarUI(); }
+                }
                 if (setting === 'wireframeEnabled') initWireframeToggle();
                 if (setting === 'escBypassEnabled') initESCBypass();
                 if (setting === 'playerCountEnabled') {
@@ -763,13 +817,18 @@ function createMenu() {
                         if (toggleBtn) toggleBtn.remove();
                     }
                 }
+                if (setting === 'slideHopEnabled' || setting === 'springHopEnabled') {
+                    // Reset states when toggled
+                    isDoingSlideHop = false;
+                    isDoingSpringHop = false;
+                }
                 saveSettings();
             }
         });
     });
 }
 
-// ========== KEY LISTENERS (FIXED) ==========
+// ========== KEY LISTENERS ==========
 document.addEventListener('keydown', (e) => {
     // Track pressed keys
     if (e.code === 'KeyW') pressedKeys.W = true;
@@ -823,13 +882,21 @@ loadSettings();
 window.hjarLastMs = 0;
 createCrosshair();
 createFPS();
-if (settings.showMenu) createMenu();
-if (settings.wireframeEnabled) initWireframeToggle();
-if (settings.escBypassEnabled) initESCBypass();
-if (settings.playerCountEnabled) initPlayerCount();
-if (settings.clockEnabled) initClock();
+
+// Initialize Hjar first (it needs WebGL)
+if (settings.hjarEnabled) initHjar();
+
+// Create menu after a delay to ensure DOM is ready
+setTimeout(() => {
+    if (settings.showMenu) createMenu();
+    if (settings.wireframeEnabled) initWireframeToggle();
+    if (settings.escBypassEnabled) initESCBypass();
+    if (settings.playerCountEnabled) initPlayerCount();
+    if (settings.clockEnabled) initClock();
+}, 500);
+
 mainLoop();
 
 console.log("%c⚡ NEZA CLIENT LOADED", "color: #ff4500; font-size: 20px; font-weight: bold;");
 console.log("%cAll features working! Press [M] for menu.", "color: #1e90ff; font-size: 14px;");
-console.log("%cSlide-Hop: Hold W+Space | Spring-Hop: Hold Space | Wireframe: Press G", "color: #ff8c00; font-size: 12px;");
+console.log("%cHjar: Toggle Menu | Slide-Hop: Hold W+Space | Spring-Hop: Hold Space | Wireframe: Press G", "color: #ff8c00; font-size: 12px;");
