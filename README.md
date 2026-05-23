@@ -7,8 +7,6 @@
    Feature               | Keybind       | Description                          |
  |-----------------------|--------------|--------------------------------------|
  | **Hjar (ESP)**        | Toggle Menu  | Wallhack: See players through walls. |
- | **Slide-Hop**         | Hold W + Space | Auto-performs Slide-Hop technique. |
- | **Spring-Hop**        | Hold Space   | Auto-performs Spring-Hop technique. |
  | **Wireframe Toggle**  | **G**        | Toggle wireframe rendering.          |
  | **ESC Menu Bypass**   | Automatic    | Removes 3-second delay on ESC menu.  |
  | **Player Count**      | Automatic    | Shows player counts per region.      |
@@ -35,7 +33,7 @@
    // @grant        none
    // @run-at       document-start
    // ==/UserScript==
-4.Save and refresh Kirka.io.
+ 4.Save and refresh Kirka.io.
 
 🎮 Usage
 
