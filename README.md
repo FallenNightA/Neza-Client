@@ -62,7 +62,9 @@ Compliant with Kirka.io’s Terms of Service.
 💬 Support
 
 Bug Reports: Open an issue on GitHub.
+
 Feature Requests: DM me on Discord or GitHub.
+
 Donations: Not required, but appreciated! 😊
 
 Made with ❤️ by Fallen
