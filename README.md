@@ -35,3 +35,34 @@
    // @grant        none
    // @run-at       document-start
    // ==/UserScript==
+4.Save and refresh Kirka.io.
+
+🎮 Usage
+
+Press [M] to open the menu.
+Toggle features ON/OFF as needed.
+Wireframe Toggle: Press G to toggle.
+Clock: Click the 🕑 button to show/hide or right-click to change themes.
+Player Count: Appears at the bottom of the screen.
+
+🛠️ Customization
+Edit main.js to:
+
+Change keybinds (e.g., G for wireframe).
+Adjust colors/themes.
+Add new features.
+
+⚠️ Ethical Note
+This client is 100% ethical:
+
+No cheating/hacking.
+Only visual and UI enhancements.
+Compliant with Kirka.io’s Terms of Service.
+
+💬 Support
+
+Bug Reports: Open an issue on GitHub.
+Feature Requests: DM me on Discord or GitHub.
+Donations: Not required, but appreciated! 😊
+
+Made with ❤️ by Fallen
